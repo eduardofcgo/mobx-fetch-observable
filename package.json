@@ -1,0 +1,73 @@
+{
+  "name": "mobx-fetch-observable",
+  "version": "1.0.0",
+  "sideEffects": false,
+  "main": "lib/src/fetch-observable.js",
+  "types": "lib/src/fetch-observable.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prettier": "prettier --write \"**/*.js\" \"**/*.ts\"",
+    "watch": "jest --watch",
+    "test": "jest",
+    "coverage": "jest --coverage"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eduardofcgo/fetch-observable"
+  },
+  "author": "Eduardo Gonçalves",
+  "files": [
+    "lib/"
+  ],
+  "devDependencies": {
+    "@types/jest": "^25.2.3",
+    "husky": "^4.2.5",
+    "jest": "^26.0.1",
+    "lint-staged": "^10.2.6",
+    "mobx": "^6.0.0",
+    "prettier": "^2.0.5",
+    "ts-jest": "^26.0.0",
+    "typescript": "^4.0.3"
+  },
+  "dependencies": {},
+  "peerDependencies": {
+    "mobx": "^6.0.0"
+  },
+  "keywords": [
+    "mobx",
+    "mobx-utils",
+    "promise",
+    "reactive",
+    "frp",
+    "functional-reactive-programming",
+    "state management"
+  ],
+  "jest": {
+    "transform": {
+      "^.+\\.ts?$": "ts-jest"
+    },
+    "testRegex": "test/.*\\.(t|j)sx?$",
+    "moduleFileExtensions": [
+      "ts",
+      "js",
+      "json"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/lib/",
+      "/coverage/",
+      "/\\./"
+    ],
+    "watchPathIgnorePatterns": [
+      "<rootDir>/node_modules/"
+    ]
+  },
+  "lint-staged": {
+    "*.{ts,js}": "prettier --write"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  }
+}
