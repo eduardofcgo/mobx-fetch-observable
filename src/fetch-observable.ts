@@ -35,7 +35,7 @@ export function fetchObservable<T>(
                 pending.set(true)
             })
 
-            fetch((newValue) => {
+            fetch((newValue: T | undefined) => {
                 _allowStateChanges(true, () => {
                     value.set(newValue)
                     pending.set(false)
