@@ -24,7 +24,7 @@ export function fetchObservable<T>(
         sink(initialValue)
     }
 
-    const fetch = observable.box<Fetch<T | undefined>>(initialFetch || emptyFetch, { deep: false })
+    let fetch = initialFetch || emptyFetch
     const value = observable.box<T | undefined>(initialValue, { deep: false })
     const pending = observable.box<boolean>(false)
 
@@ -35,8 +35,7 @@ export function fetchObservable<T>(
                 pending.set(true)
             })
 
-            const currentFetch = fetch.get()
-            currentFetch((newValue) => {
+            fetch((newValue) => {
                 _allowStateChanges(true, () => {
                     value.set(newValue)
                     pending.set(false)
@@ -54,7 +53,7 @@ export function fetchObservable<T>(
     })
 
     const setFetchFnc = action("lazyObservable-setFetch", (newFetch: Fetch<T>): T | undefined => {
-        fetch.set(newFetch)
+        fetch = newFetch
         return value.get()
     })
 
@@ -74,7 +73,7 @@ export function fetchObservable<T>(
             return pending.get()
         },
         get started() {
-            return started && fetch.get() !== emptyFetch
+            return started && fetch !== emptyFetch
         },
     }
 }

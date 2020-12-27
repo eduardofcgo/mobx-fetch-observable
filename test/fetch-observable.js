@@ -119,6 +119,31 @@ test("fetch observable pending can be observed", (done) => {
     }, 200)
 })
 
+test("fetch observable started can be observed", (done) => {
+    const fo = fetchObservable((sink) =>
+        setTimeout(() => {
+            sink(1)
+        }, 100)
+    )
+
+    const values = []
+    const startedValues = []
+
+    mobx.autorun(() => {
+        const value = fo.current()
+
+        values.push(value)
+        startedValues.push(fo.started)
+    })
+
+    setTimeout(() => {
+        expect(values).toEqual([undefined, 1])
+        expect(startedValues).toEqual([true, true])
+
+        done()
+    }, 200)
+})
+
 test("lazy observable fetch", (done) => {
     let started = 0
     let i = 10
@@ -201,8 +226,8 @@ test("unstarted fetch observable should fetch", (done) => {
 
     setTimeout(() => {
         expect(fo.current()).toBe(1)
-        expect(values).toEqual([undefined, undefined, 1])
-        expect(startValues).toEqual([false, true, true])
+        expect(values).toEqual([undefined, 1])
+        expect(startValues).toEqual([false, true])
 
         done()
     }, 200)
