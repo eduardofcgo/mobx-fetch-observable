@@ -354,7 +354,7 @@ test("fetch observable map before sync result arrives", (done) => {
 
     setTimeout(() => {
         expect(fo.current()).toBe(2)
-        expect(values).toEqual([1, 2])
+        expect(values).toEqual([2])
 
         done()
     }, 300)
@@ -449,3 +449,5 @@ test("fetch observable flatmap before instant result arrives", (done) => {
         done()
     }, 400)
 })
+
+// TODO: test fetch is made after a map

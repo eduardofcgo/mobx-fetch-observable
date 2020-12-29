@@ -1,18 +1,19 @@
 import { observable, action, reaction, _allowStateChanges, when } from "mobx"
 
 type Fetch<T> = (sink: (newValue: T) => void) => void
+type MapFun<A, B> = ((value: A) => B)
 
-function id<T>(value: T): T {
-    return value
-}
+// @ts-ignore
+const compose = (fn1, fn2) => value => fn2(fn1(value))
+const id = <T>(x: T): T => x
 
 export interface IFetchObservable<T> {
     current(): T | undefined
     fetch(): T | undefined
     set(value: T | undefined): T | undefined
     setFetch(newFetch: Fetch<T>): T | undefined
-    mapFetch(fn: (value: T | undefined) => T | undefined): T | undefined
-    flatMapFetch(fn: (value: T | undefined) => IFetchObservable<T | undefined>): T | undefined
+    mapFetch(fn: MapFun<T | undefined, T | undefined>): T | undefined
+    flatMapFetch(fn: MapFun<T | undefined, IFetchObservable<T | undefined>>): T | undefined
     pending: boolean
     started: boolean
     fulfilled: boolean
@@ -31,21 +32,11 @@ export function fetchObservable<T>(
         sink(initialValue)
     }
 
-    let fetch = initialFetch || emptyFetch
+    let fetch: Fetch<T> | Fetch<undefined> = initialFetch || emptyFetch
     const value = observable.box<T | undefined>(initialValue, { deep: false })
     const pending = observable.box<boolean>(false)
 
-    let mapFns: ((value: T | undefined) => T | undefined)[] = []
-
-    reaction(
-        () => value.get(),
-        (newValue, oldValue) => {
-            const comp = mapFns.reduce((acc, c, i, a) => (v) => c(acc(v)), id)
-
-            value.set(comp(newValue))
-            mapFns = []
-        }
-    )
+    let mapFn: ((value: T | undefined) => T | undefined) = id
 
     const currentFnc = () => {
         if (!started) {
@@ -56,7 +47,7 @@ export function fetchObservable<T>(
 
             fetch((newValue: T | undefined) => {
                 _allowStateChanges(true, () => {
-                    value.set(newValue)
+                    value.set(mapFn(newValue))
                     pending.set(false)
                 })
             })
@@ -100,7 +91,7 @@ export function fetchObservable<T>(
         mapFetch(fn: (value: T | undefined) => T | undefined): T | undefined {
             if (this.fulfilled) return this.set(fn(value.get()))
             else {
-                mapFns.push(fn)
+                mapFn = compose(fn, mapFn)
                 return value.get()
             }
         },
