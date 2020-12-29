@@ -43,7 +43,6 @@ export function fetchObservable<T>(
             const comp = mapFns.reduce((acc, c, i, a) => (v) => c(acc(v)), id)
 
             value.set(comp(newValue))
-
             mapFns = []
         }
     )
