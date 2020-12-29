@@ -36,7 +36,7 @@ export function fetchObservable<T>(
     const value = observable.box<T | undefined>(initialValue, { deep: false })
     const pending = observable.box<boolean>(false)
 
-    let mapFn: ((value: T | undefined) => T | undefined) = id
+    let mapFn: MapFun<T | undefined, T | undefined> = id
 
     const currentFnc = () => {
         if (!started) {
