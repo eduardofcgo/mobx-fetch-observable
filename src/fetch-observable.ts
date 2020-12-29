@@ -106,18 +106,18 @@ export function fetchObservable<T>(
         },
         flatMapFetch(fn: (value: T | undefined) => IFetchObservable<T | undefined>): T | undefined {
             return this.mapFetch((value) => {
-                const o = fn(value)
+                const outerObservable = fn(value)
                 // inner observable is needed as soon as the map function from
                 // outer observable is called, which is when the outer is fulfilled
-                o.current()
+                outerObservable.current()
 
-                const innerValue = o.mapFetch((innerValue) => {
+                const innerValue = outerObservable.mapFetch((innerValue) => {
                     this.set(innerValue)
 
                     return innerValue
                 })
 
-                return o.fulfilled ? innerValue : value
+                return outerObservable.fulfilled ? innerValue : value
             })
         },
     }
