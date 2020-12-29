@@ -443,7 +443,7 @@ test("fetch observable flatmap before instant result arrives", (done) => {
     })
 
     setTimeout(() => {
-        //expect(fo.current()).toBe(11)
+        expect(fo.current()).toBe(11)
         expect(values).toEqual([undefined, 11])
 
         done()
