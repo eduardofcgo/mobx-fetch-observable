@@ -13,6 +13,7 @@ export interface IFetchObservable<T> {
     forEach(run: ((newValue: T) => void)): void
     map<B>(fn: ((value: T) => B)): IFetchObservable<B>
     flatMap<B>(fn: ((value: T) => IFetchObservable<B>)): IFetchObservable<B>
+    then<B>(fn: ((value: T) => (B | IFetchObservable<B>))): IFetchObservable<B>
 }
 
 export class FetchObservable<T> implements IFetchObservable<T> {
