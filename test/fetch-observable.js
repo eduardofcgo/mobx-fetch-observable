@@ -286,16 +286,10 @@ test("unstarted fetch observable should fetch", (done) => {
     })
 
     fo.setFetch((sink) => {
-        setTimeout(() => sink(1), 50)
+        setTimeout(() => sink(1), 100)
     })
 
     expect(fo.current()).toBe(undefined)
-
-    setTimeout(() => {
-        expect(fo.current()).toBe(undefined)
-
-        fo.fetch()
-    }, 100)
 
     setTimeout(() => {
         expect(fo.current()).toBe(1)
@@ -303,7 +297,7 @@ test("unstarted fetch observable should fetch", (done) => {
         expect(startValues).toEqual([false, true])
 
         done()
-    }, 200)
+    }, 300)
 })
 
 test("fetch observable pending can be observed on setFetch", (done) => {
@@ -370,7 +364,7 @@ test("started fetch observable should fetch", (done) => {
 
 test("fetch observable async map does not alter original observable", (done) => {
     const fo = new FetchObservable((sink) => setTimeout(() => sink(1), 100))
-    const fo2 = fo.mapFetch((value) => value + 1)
+    const fo2 = fo.map((value) => value + 1)
 
     const values = []
 
@@ -388,9 +382,9 @@ test("fetch observable async map does not alter original observable", (done) => 
     }, 200)
 })
 
-test("fetch observable sync map has no side effects", (done) => {
+test("fetch observable sync map does not alter original observable", (done) => {
     const fo = new FetchObservable((sink) => sink(1))
-    const fo2 = fo.mapFetch((value) => value + 1)
+    const fo2 = fo.map((value) => value + 1)
 
     const values = []
 
@@ -410,7 +404,7 @@ test("fetch observable sync map has no side effects", (done) => {
 
 test("fetch observable map before async result arrives", (done) => {
     const fo1 = new FetchObservable((sink) => setTimeout(() => sink(1), 100))
-    const fo2 = fo1.mapFetch((value) => value + 1)
+    const fo2 = fo1.map((value) => value + 1)
 
     const values = []
 
@@ -434,7 +428,7 @@ test("fetch observable map after sync result arrives", (done) => {
     expect(fo1.current()).toBe(1)
 
     setTimeout(() => {
-        const fo2 = fo1.mapFetch((value) => value + 1)
+        const fo2 = fo1.map((value) => value + 1)
 
         const values = []
 
@@ -454,7 +448,7 @@ test("fetch observable map after sync result arrives", (done) => {
     }, 100)
 })
 
-test("mapped fetch observable fetches", (done) => {
+test("fetch observable mapped fetches", (done) => {
     let i = 0
     const fo1 = new FetchObservable((sink) =>
         setTimeout(() => {
@@ -464,7 +458,7 @@ test("mapped fetch observable fetches", (done) => {
     )
 
     let j = 0
-    const fo2 = fo1.mapFetch((value) => {
+    const fo2 = fo1.map((value) => {
         j++
         return value + 1
     })
@@ -508,4 +502,231 @@ test("mapped fetch observable fetches", (done) => {
         done()
     }, 700)
 
+})
+
+test("fetch observable forEach sync", done => {
+    const fo = new FetchObservable(sink => sink(1))
+
+    const values = []
+
+    fo.forEach(value => {
+        values.push(value)
+    })
+
+    expect(values).toEqual([1])
+
+    done()
+})
+
+test("fetch observable forEach async", done => {
+    const fo = new FetchObservable(sink => {
+        setTimeout(() => {
+            sink(1)
+            sink(2)
+        }, 100)
+    })
+
+    const values = []
+
+    fo.forEach(value => {
+        values.push(value)
+    })
+
+    setTimeout(() => {
+        expect(values).toEqual([1, 2])
+    }, 200)
+
+    done()
+})
+
+test("fetch observable forEach runs with fetch", done => {
+    let i = 0
+    const fo = new FetchObservable(sink => {
+        setTimeout(() => {
+            i++
+            sink(i)
+        }, 100)
+    })
+
+    const values = []
+
+    fo.forEach(value => {
+        values.push(value)
+    })
+
+    setTimeout(() => {
+        fo.fetch()
+    }, 200)
+
+    setTimeout(() => {
+        expect(values).toEqual([1, 2])
+    }, 500)
+
+    done()
+})
+
+test("fetch observable flatmap does not alter original observable", (done) => {
+    const fo = new FetchObservable((sink) => setTimeout(() => sink(1), 100))
+    const fo2 = fo.flatMap((value) => new FetchObservable(sink => sink(value + 1)))
+
+    const values = []
+
+    mobx.autorun(() => {
+        const value = fo.current()
+
+        values.push(value)
+    })
+
+    setTimeout(() => {
+        expect(fo.current()).toBe(1)
+        expect(values).toEqual([undefined, 1])
+
+        done()
+    }, 200)
+})
+
+test("fetch observable flatmap before async result arrives", (done) => {
+    const fo1 = new FetchObservable((sink) => setTimeout(() => sink(1), 100))
+    const fo2 = fo1.flatMap((value) => new FetchObservable(sink => sink(value + 1)))
+
+    const values = []
+
+    mobx.autorun(() => {
+        const value = fo2.current()
+
+        values.push(value)
+    })
+
+    setTimeout(() => {
+        expect(fo2.current()).toBe(2)
+        expect(values).toEqual([undefined, 2])
+
+        done()
+    }, 200)
+})
+
+test("fetch observable flatmap after sync result arrives", (done) => {
+    const fo1 = new FetchObservable((sink) => sink(1))
+
+    expect(fo1.current()).toBe(1)
+
+    setTimeout(() => {
+        const fo2 = fo1.flatMap((value) => new FetchObservable(sink => {
+            sink(value + 1)
+        }))
+
+        const values = []
+
+        mobx.autorun(() => {
+            const value = fo2.current()
+
+            values.push(value)
+        })
+
+        setTimeout(() => {
+            expect(fo1.current()).toBe(1)
+            expect(fo2.current()).toBe(2)
+            expect(values).toEqual([undefined, 2])
+
+            done()
+        }, 200)
+    }, 100)
+})
+
+test("fetch observable flatmapped fetch", (done) => {
+    let i = 0
+    const fo1 = new FetchObservable((sink) =>
+        setTimeout(() => {
+            i++
+            sink(i)
+        }, 100)
+    )
+
+    let j = 0
+    const fo2 = fo1.flatMap((value) => {
+        j++
+        return new FetchObservable(sink => {
+            sink(value + 1)
+        })
+    })
+
+    const values = []
+
+    mobx.autorun(() => {
+        const value = fo2.current()
+
+        values.push(value)
+    })
+
+    setTimeout(() => {
+        fo1.fetch()
+    }, 300)
+
+    setTimeout(() => {
+        fo2.fetch()
+    }, 600)
+
+    setTimeout(() => {
+        expect(fo2.current()).toBe(2)
+        expect(values).toEqual([undefined, 2])
+        expect(i).toBe(1)
+        expect(j).toBe(1)
+    }, 200)
+
+    setTimeout(() => {
+        expect(fo2.current()).toBe(3)
+        expect(values).toEqual([undefined, 2, 3])
+        expect(i).toBe(2)
+        expect(j).toBe(2)
+    }, 500)
+
+    setTimeout(() => {
+        expect(fo2.current()).toBe(3)
+        expect(values).toEqual([undefined, 2, 3])
+        expect(i).toBe(2)
+        expect(j).toBe(3)
+
+        done()
+    }, 700)
+
+})
+
+test("fetch observable then map function returns observable", (done) => {
+    const fo1 = new FetchObservable((sink) => setTimeout(() => sink(1), 100))
+    const fo2 = fo1.then((value) => new FetchObservable(sink => sink(value + 1)))
+
+    const values = []
+
+    mobx.autorun(() => {
+        const value = fo2.current()
+
+        values.push(value)
+    })
+
+    setTimeout(() => {
+        expect(fo2.current()).toBe(2)
+        expect(values).toEqual([undefined, 2])
+
+        done()
+    }, 200)
+})
+
+test("fetch observable then map function does not return observable", (done) => {
+    const fo1 = new FetchObservable((sink) => setTimeout(() => sink(1), 100))
+    const fo2 = fo1.then((value) => value + 1)
+
+    const values = []
+
+    mobx.autorun(() => {
+        const value = fo2.current()
+
+        values.push(value)
+    })
+
+    setTimeout(() => {
+        expect(fo2.current()).toBe(2)
+        expect(values).toEqual([undefined, 2])
+
+        done()
+    }, 200)
 })

@@ -1,28 +1,23 @@
-import { observable, action, reaction, _allowStateChanges, IObservableValue } from "mobx"
+import { observable, action, reaction, _allowStateChanges, IObservableValue, runInAction } from "mobx"
 
 type Fetch<T> = (sink: (newValue: T) => void) => void
-type MapFun<A, B> = (value: A) => B // TODO: use Function1
 
 export interface IFetchObservable<T> {
-    current(): T | undefined
-    fetch(): T | undefined
-    set(value: T | undefined): T | undefined
-    setFetch(newFetch: Fetch<T>): T | undefined
-    mapFetch<B>(fn: MapFun<T, B>): IFetchObservable<B>
-    //flatMapFetch<B>(fn: MapFun<T, IFetchObservable<B>>): IFetchObservable<B>
     pending: boolean
     started: boolean
     fulfilled: boolean
-}
-
-const initialValue = undefined
-const emptyFetch: Fetch<undefined> = (sink) => {
-    sink(initialValue)
+    current(): T | undefined
+    fetch(): T | undefined
+    set(value: T): T | undefined
+    setFetch(newFetch: Fetch<T>): T | undefined
+    forEach(run: ((newValue: T) => void)): void
+    map<B>(fn: ((value: T) => B)): IFetchObservable<B>
+    flatMap<B>(fn: ((value: T) => IFetchObservable<B>)): IFetchObservable<B>
 }
 
 export class FetchObservable<T> implements IFetchObservable<T> {
     private _started: boolean
-    private _fetch: Fetch<T> | Fetch<undefined>
+    private _fetch: Fetch<T> | undefined
     private _pending: IObservableValue<boolean>
 
     value: IObservableValue<T | undefined>
@@ -30,27 +25,13 @@ export class FetchObservable<T> implements IFetchObservable<T> {
     constructor(initialFetch: Fetch<T> | undefined = undefined) {
         this._started = false
 
-        this._fetch = initialFetch || emptyFetch
-        this.value = observable.box<T | undefined>(initialValue, { deep: false })
+        this._fetch = initialFetch
+        this.value = observable.box<T | undefined>(undefined, { deep: false })
         this._pending = observable.box<boolean>(false)
     }
 
-    setFnc = action("fetchObservable-set", (newValue: T | undefined) => {
-        this.value.set(newValue)
-        this._pending.set(false)
-        return this.value.get()
-    })
-
-    setFetchFnc = action("fetchObservable-setFetch", (newFetch: Fetch<T>): T | undefined => {
-        this._fetch = newFetch
-        return this.value.get()
-    })
-
-    current() {
-        // TODO: check if if initital fetch, if so, simply return this.value.get()
-        // this simpliied the types for the fetch, it does not need the | undefined as the inner type
-        // with this, it would be much easier to implement the fulfulled and we could have undefined fullfilled states
-        if (!this._started) {
+    current(): T | undefined {
+        if (this._fetch !== undefined && !this._started) {
             this._started = true
             _allowStateChanges(true, () => {
                 this._pending.set(true)
@@ -67,41 +48,74 @@ export class FetchObservable<T> implements IFetchObservable<T> {
         return this.value.get()
     }
 
-    fetch() {
+    fetch(): T | undefined {
         if (this._started) this._started = false
         return this.current()
     }
 
-    set(newVal: T | undefined) {
-        return this.setFnc(newVal)
+    set(newValue: T | undefined): T | undefined {
+        runInAction(() => {
+            this.value.set(newValue)
+            this._pending.set(false)
+
+        })
+        return this.value.get()
     }
 
     setFetch(newFetch: Fetch<T>): T | undefined {
-        return this.setFetchFnc(newFetch)
+        this._fetch = newFetch
+        return this.value.get()
     }
 
-    get pending() {
+    get pending(): boolean {
         return this._pending.get()
     }
 
-    get started() {
-        // TODO: how does this work if started is not being watched
-        return this._started && this._fetch !== emptyFetch
+    get started(): boolean {
+        return this._started && this._fetch !== undefined
     }
 
-    get fulfilled() {
+    get fulfilled(): boolean {
         return this.value.get() !== undefined
     }
 
-    mapFetch<B>(fn: (value: T) => B): FetchObservable<B> {
-        return new FetchObservable<B>((sink) => {
-            reaction(
-                () => this.current(),
-                (newValue) => {
-                    if (newValue !== undefined) sink(fn(newValue))
-                },
-                { fireImmediately: true, name: "fetchObservable-updateMapped" }
-            )
+    forEach(run: ((newValue: T) => void)): void {
+        reaction(
+            () => this.current(),
+            (newValue) => {
+                if (newValue !== undefined) run(newValue)
+            },
+            { fireImmediately: true, name: "fetchObservable-forEach" }
+        )
+    }
+
+    map<B>(fn: (value: T) => B): IFetchObservable<B> {
+        return new FetchObservable<B>(sink => {
+            this.forEach(newValue => {
+                sink(fn(newValue))
+            })
+        })
+    }
+
+    flatMap<B>(fn: ((value: T) => IFetchObservable<B>)): IFetchObservable<B> {
+        return new FetchObservable<B>(sink => {
+            this.forEach(newValue => {
+                fn(newValue).forEach(sink)
+            })
+        })
+    }
+
+    then<B>(fn: ((value: T) => (B | IFetchObservable<B>))): IFetchObservable<B> {
+        return new FetchObservable<B>(sink => {
+            this.forEach(newValue => {
+                const maybeObs: B | IFetchObservable<B> = fn(newValue)
+
+                if (maybeObs instanceof FetchObservable)
+                    maybeObs.forEach(sink)
+                else
+                    // @ts-ignore
+                    sink(maybeObs)
+            })
         })
     }
 }

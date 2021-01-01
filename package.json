@@ -1,6 +1,6 @@
 {
   "name": "mobx-fetch-observable",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "sideEffects": false,
   "main": "lib/src/fetch-observable.js",
   "types": "lib/src/fetch-observable.d.ts",
