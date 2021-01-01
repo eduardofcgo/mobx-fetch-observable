@@ -1,115 +1,107 @@
-import { observable, action, reaction, _allowStateChanges, when } from "mobx"
+import { observable, action, reaction, _allowStateChanges, IObservableValue } from "mobx"
 
 type Fetch<T> = (sink: (newValue: T) => void) => void
-type MapFun<A, B> = ((value: A) => B)
-
-// @ts-ignore
-const compose = (fn1, fn2) => value => fn2(fn1(value))
-const id = <T>(x: T): T => x
+type MapFun<A, B> = (value: A) => B // TODO: use Function1
 
 export interface IFetchObservable<T> {
     current(): T | undefined
     fetch(): T | undefined
     set(value: T | undefined): T | undefined
     setFetch(newFetch: Fetch<T>): T | undefined
-    mapFetch(fn: MapFun<T | undefined, T | undefined>): T | undefined
-    flatMapFetch(fn: MapFun<T | undefined, IFetchObservable<T | undefined>>): T | undefined
+    mapFetch<B>(fn: MapFun<T, B>): IFetchObservable<B>
+    //flatMapFetch<B>(fn: MapFun<T, IFetchObservable<B>>): IFetchObservable<B>
     pending: boolean
     started: boolean
     fulfilled: boolean
 }
 
-export function fetchObservable<T>(fetch: Fetch<T>): IFetchObservable<T | undefined>
-export function fetchObservable(): IFetchObservable<undefined>
+const initialValue = undefined
+const emptyFetch: Fetch<undefined> = (sink) => {
+    sink(initialValue)
+}
 
-export function fetchObservable<T>(
-    initialFetch: Fetch<T> | undefined = undefined
-): IFetchObservable<T> {
-    let started = false
+export class FetchObservable<T> implements IFetchObservable<T> {
+    private _started: boolean
+    private _fetch: Fetch<T> | Fetch<undefined>
+    private _pending: IObservableValue<boolean>
 
-    const initialValue = undefined
-    const emptyFetch: Fetch<undefined> = (sink) => {
-        sink(initialValue)
+    value: IObservableValue<T | undefined>
+
+    constructor(initialFetch: Fetch<T> | undefined = undefined) {
+        this._started = false
+
+        this._fetch = initialFetch || emptyFetch
+        this.value = observable.box<T | undefined>(initialValue, { deep: false })
+        this._pending = observable.box<boolean>(false)
     }
 
-    let fetch: Fetch<T> | Fetch<undefined> = initialFetch || emptyFetch
-    const value = observable.box<T | undefined>(initialValue, { deep: false })
-    const pending = observable.box<boolean>(false)
+    setFnc = action("fetchObservable-set", (newValue: T | undefined) => {
+        this.value.set(newValue)
+        this._pending.set(false)
+        return this.value.get()
+    })
 
-    let mapFn: MapFun<T | undefined, T | undefined> = id
+    setFetchFnc = action("fetchObservable-setFetch", (newFetch: Fetch<T>): T | undefined => {
+        this._fetch = newFetch
+        return this.value.get()
+    })
 
-    const currentFnc = () => {
-        if (!started) {
-            started = true
+    current() {
+        // TODO: check if if initital fetch, if so, simply return this.value.get()
+        // this simpliied the types for the fetch, it does not need the | undefined as the inner type
+        // with this, it would be much easier to implement the fulfulled and we could have undefined fullfilled states
+        if (!this._started) {
+            this._started = true
             _allowStateChanges(true, () => {
-                pending.set(true)
+                this._pending.set(true)
             })
 
-            fetch((newValue: T | undefined) => {
+            this._fetch((newValue: T | undefined) => {
                 _allowStateChanges(true, () => {
-                    value.set(mapFn(newValue))
-                    pending.set(false)
+                    this.value.set(newValue)
+                    this._pending.set(false)
                 })
             })
         }
 
-        return value.get()
+        return this.value.get()
     }
 
-    const setFnc = action("lazyObservable-set", (newValue: T | undefined) => {
-        value.set(newValue)
-        pending.set(false)
-        return value.get()
-    })
+    fetch() {
+        if (this._started) this._started = false
+        return this.current()
+    }
 
-    const setFetchFnc = action("lazyObservable-setFetch", (newFetch: Fetch<T>): T | undefined => {
-        fetch = newFetch
-        return value.get()
-    })
+    set(newVal: T | undefined) {
+        return this.setFnc(newVal)
+    }
 
-    return {
-        current: currentFnc,
-        fetch() {
-            if (started) started = false
-            return currentFnc()
-        },
-        set(newVal: T | undefined) {
-            return setFnc(newVal)
-        },
-        setFetch(newFetch: Fetch<T>): T | undefined {
-            return setFetchFnc(newFetch)
-        },
-        get pending() {
-            return pending.get()
-        },
-        get started() {
-            return started && fetch !== emptyFetch
-        },
-        get fulfilled() {
-            return this.started && !this.pending
-        },
-        mapFetch(fn: (value: T | undefined) => T | undefined): T | undefined {
-            if (this.fulfilled) return this.set(fn(value.get()))
-            else {
-                mapFn = compose(fn, mapFn)
-                return value.get()
-            }
-        },
-        flatMapFetch(fn: (value: T | undefined) => IFetchObservable<T | undefined>): T | undefined {
-            return this.mapFetch((value) => {
-                const outerObservable = fn(value)
-                // inner observable is needed as soon as the map function from
-                // outer observable is called, which is when the outer is fulfilled
-                outerObservable.current()
+    setFetch(newFetch: Fetch<T>): T | undefined {
+        return this.setFetchFnc(newFetch)
+    }
 
-                const innerValue = outerObservable.mapFetch((innerValue) => {
-                    this.set(innerValue)
+    get pending() {
+        return this._pending.get()
+    }
 
-                    return innerValue
-                })
+    get started() {
+        // TODO: how does this work if started is not being watched
+        return this._started && this._fetch !== emptyFetch
+    }
 
-                return outerObservable.fulfilled ? innerValue : value
-            })
-        },
+    get fulfilled() {
+        return this.value.get() !== undefined
+    }
+
+    mapFetch<B>(fn: (value: T) => B): FetchObservable<B> {
+        return new FetchObservable<B>((sink) => {
+            reaction(
+                () => this.current(),
+                (newValue) => {
+                    if (newValue !== undefined) sink(fn(newValue))
+                },
+                { fireImmediately: true, name: "fetchObservable-updateMapped" }
+            )
+        })
     }
 }
