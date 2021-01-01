@@ -1,4 +1,11 @@
-import { observable, action, reaction, _allowStateChanges, IObservableValue, runInAction } from "mobx"
+import {
+    observable,
+    action,
+    reaction,
+    _allowStateChanges,
+    IObservableValue,
+    runInAction,
+} from "mobx"
 
 type Fetch<T> = (sink: (newValue: T) => void) => void
 
@@ -10,10 +17,10 @@ export interface IFetchObservable<T> {
     fetch(): T | undefined
     set(value: T): T | undefined
     setFetch(newFetch: Fetch<T>): T | undefined
-    forEach(run: ((newValue: T) => void)): void
-    map<B>(fn: ((value: T) => B)): IFetchObservable<B>
-    flatMap<B>(fn: ((value: T) => IFetchObservable<B>)): IFetchObservable<B>
-    then<B>(fn: ((value: T) => (B | IFetchObservable<B>))): IFetchObservable<B>
+    forEach(run: (newValue: T) => void): void
+    map<B>(fn: (value: T) => B): IFetchObservable<B>
+    flatMap<B>(fn: (value: T) => IFetchObservable<B>): IFetchObservable<B>
+    then<B>(fn: (value: T) => B | IFetchObservable<B>): IFetchObservable<B>
 }
 
 export class FetchObservable<T> implements IFetchObservable<T> {
@@ -58,7 +65,6 @@ export class FetchObservable<T> implements IFetchObservable<T> {
         runInAction(() => {
             this.value.set(newValue)
             this._pending.set(false)
-
         })
         return this.value.get()
     }
@@ -80,7 +86,7 @@ export class FetchObservable<T> implements IFetchObservable<T> {
         return this.value.get() !== undefined
     }
 
-    forEach(run: ((newValue: T) => void)): void {
+    forEach(run: (newValue: T) => void): void {
         reaction(
             () => this.current(),
             (newValue) => {
@@ -91,31 +97,29 @@ export class FetchObservable<T> implements IFetchObservable<T> {
     }
 
     map<B>(fn: (value: T) => B): IFetchObservable<B> {
-        return new FetchObservable<B>(sink => {
-            this.forEach(newValue => {
+        return new FetchObservable<B>((sink) => {
+            this.forEach((newValue) => {
                 sink(fn(newValue))
             })
         })
     }
 
-    flatMap<B>(fn: ((value: T) => IFetchObservable<B>)): IFetchObservable<B> {
-        return new FetchObservable<B>(sink => {
-            this.forEach(newValue => {
+    flatMap<B>(fn: (value: T) => IFetchObservable<B>): IFetchObservable<B> {
+        return new FetchObservable<B>((sink) => {
+            this.forEach((newValue) => {
                 fn(newValue).forEach(sink)
             })
         })
     }
 
-    then<B>(fn: ((value: T) => (B | IFetchObservable<B>))): IFetchObservable<B> {
-        return new FetchObservable<B>(sink => {
-            this.forEach(newValue => {
+    then<B>(fn: (value: T) => B | IFetchObservable<B>): IFetchObservable<B> {
+        return new FetchObservable<B>((sink) => {
+            this.forEach((newValue) => {
                 const maybeObs: B | IFetchObservable<B> = fn(newValue)
 
-                if (maybeObs instanceof FetchObservable)
-                    maybeObs.forEach(sink)
-                else
-                    // @ts-ignore
-                    sink(maybeObs)
+                if (maybeObs instanceof FetchObservable) maybeObs.forEach(sink)
+                // @ts-ignore
+                else sink(maybeObs)
             })
         })
     }

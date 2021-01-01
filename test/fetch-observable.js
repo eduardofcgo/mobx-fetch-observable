@@ -501,15 +501,14 @@ test("fetch observable mapped fetches", (done) => {
 
         done()
     }, 700)
-
 })
 
-test("fetch observable forEach sync", done => {
-    const fo = new FetchObservable(sink => sink(1))
+test("fetch observable forEach sync", (done) => {
+    const fo = new FetchObservable((sink) => sink(1))
 
     const values = []
 
-    fo.forEach(value => {
+    fo.forEach((value) => {
         values.push(value)
     })
 
@@ -518,8 +517,8 @@ test("fetch observable forEach sync", done => {
     done()
 })
 
-test("fetch observable forEach async", done => {
-    const fo = new FetchObservable(sink => {
+test("fetch observable forEach async", (done) => {
+    const fo = new FetchObservable((sink) => {
         setTimeout(() => {
             sink(1)
             sink(2)
@@ -528,7 +527,7 @@ test("fetch observable forEach async", done => {
 
     const values = []
 
-    fo.forEach(value => {
+    fo.forEach((value) => {
         values.push(value)
     })
 
@@ -539,9 +538,9 @@ test("fetch observable forEach async", done => {
     done()
 })
 
-test("fetch observable forEach runs with fetch", done => {
+test("fetch observable forEach runs with fetch", (done) => {
     let i = 0
-    const fo = new FetchObservable(sink => {
+    const fo = new FetchObservable((sink) => {
         setTimeout(() => {
             i++
             sink(i)
@@ -550,7 +549,7 @@ test("fetch observable forEach runs with fetch", done => {
 
     const values = []
 
-    fo.forEach(value => {
+    fo.forEach((value) => {
         values.push(value)
     })
 
@@ -567,7 +566,7 @@ test("fetch observable forEach runs with fetch", done => {
 
 test("fetch observable flatmap does not alter original observable", (done) => {
     const fo = new FetchObservable((sink) => setTimeout(() => sink(1), 100))
-    const fo2 = fo.flatMap((value) => new FetchObservable(sink => sink(value + 1)))
+    const fo2 = fo.flatMap((value) => new FetchObservable((sink) => sink(value + 1)))
 
     const values = []
 
@@ -587,7 +586,7 @@ test("fetch observable flatmap does not alter original observable", (done) => {
 
 test("fetch observable flatmap before async result arrives", (done) => {
     const fo1 = new FetchObservable((sink) => setTimeout(() => sink(1), 100))
-    const fo2 = fo1.flatMap((value) => new FetchObservable(sink => sink(value + 1)))
+    const fo2 = fo1.flatMap((value) => new FetchObservable((sink) => sink(value + 1)))
 
     const values = []
 
@@ -611,9 +610,12 @@ test("fetch observable flatmap after sync result arrives", (done) => {
     expect(fo1.current()).toBe(1)
 
     setTimeout(() => {
-        const fo2 = fo1.flatMap((value) => new FetchObservable(sink => {
-            sink(value + 1)
-        }))
+        const fo2 = fo1.flatMap(
+            (value) =>
+                new FetchObservable((sink) => {
+                    sink(value + 1)
+                })
+        )
 
         const values = []
 
@@ -645,7 +647,7 @@ test("fetch observable flatmapped fetch", (done) => {
     let j = 0
     const fo2 = fo1.flatMap((value) => {
         j++
-        return new FetchObservable(sink => {
+        return new FetchObservable((sink) => {
             sink(value + 1)
         })
     })
@@ -688,12 +690,11 @@ test("fetch observable flatmapped fetch", (done) => {
 
         done()
     }, 700)
-
 })
 
 test("fetch observable then map function returns observable", (done) => {
     const fo1 = new FetchObservable((sink) => setTimeout(() => sink(1), 100))
-    const fo2 = fo1.then((value) => new FetchObservable(sink => sink(value + 1)))
+    const fo2 = fo1.then((value) => new FetchObservable((sink) => sink(value + 1)))
 
     const values = []
 
